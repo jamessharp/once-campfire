@@ -63,6 +63,8 @@ Rails.application.routes.draw do
     resources :messages
 
     post ":bot_key/messages", to: "messages/by_bots#create", as: :bot_messages
+    post ":bot_key/typing", to: "typing_notifications/by_bots#create", as: :bot_typing
+    delete ":bot_key/typing", to: "typing_notifications/by_bots#destroy"
 
     scope module: "rooms" do
       resource :refresh, only: :show

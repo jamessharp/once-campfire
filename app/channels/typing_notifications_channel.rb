@@ -1,14 +1,13 @@
 class TypingNotificationsChannel < RoomChannel
+  def self.broadcast_action_to(room, action:, user:)
+    broadcast_to room, action: action, user: user.slice(:id, :name)
+  end
+
   def start(data)
-    broadcast_to @room, action: :start, user: current_user_attributes
+    self.class.broadcast_action_to @room, action: :start, user: current_user
   end
 
   def stop(data)
-    broadcast_to @room, action: :stop, user: current_user_attributes
+    self.class.broadcast_action_to @room, action: :stop, user: current_user
   end
-
-  private
-    def current_user_attributes
-      current_user.slice(:id, :name)
-    end
 end
