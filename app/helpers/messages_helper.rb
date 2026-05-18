@@ -53,11 +53,11 @@ module MessagesHelper
   def message_presentation(message)
     case message.content_type
     when "attachment"
-      message_attachment_presentation(message)
+      message_attachment_with_body_presentation(message)
     when "sound"
       message_sound_presentation(message)
     else
-      auto_link h(ContentFilters::TextMessagePresentationFilters.apply(message.body.body)), html: { target: "_blank" }
+      message_body_presentation(message)
     end
   rescue Exception => e
     Sentry.capture_exception(e, extra: { message: message })
@@ -85,6 +85,16 @@ module MessagesHelper
 
     def message_attachment_presentation(message)
       Messages::AttachmentPresentation.new(message, context: self).render
+    end
+
+    def message_attachment_with_body_presentation(message)
+      safe_join [ message_body_presentation(message).presence, message_attachment_presentation(message) ].compact
+    end
+
+    def message_body_presentation(message)
+      if message.body.to_plain_text.present?
+        auto_link h(ContentFilters::TextMessagePresentationFilters.apply(message.body.body)), html: { target: "_blank" }
+      end
     end
 
     def message_sound_presentation(message)

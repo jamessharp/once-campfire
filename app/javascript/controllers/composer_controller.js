@@ -10,6 +10,7 @@ export default class extends Controller {
   static outlets = [ "messages" ]
 
   #files = []
+  #uploadBodyHTML = new Map()
 
   connect() {
     if (!this.#usingTouchDevice) {
@@ -21,8 +22,7 @@ export default class extends Controller {
     event.preventDefault()
 
     if (!this.fieldsTarget.disabled) {
-      this.#submitFiles()
-      this.#submitMessage()
+      this.#submit()
       this.collapseToolbar()
       this.textTarget.focus()
     }
@@ -125,31 +125,53 @@ export default class extends Controller {
     }
   }
 
+  async #submit() {
+    const files = this.#files
+
+    if (files.length > 0) {
+      await this.#submitFiles(files)
+    } else {
+      await this.#submitMessage()
+    }
+  }
+
   #validInput() {
     return this.textTarget.textContent.trim().length > 0
   }
 
-  async #submitFiles() {
-    const files = this.#files
-
+  async #submitFiles(files) {
     this.#files = []
     this.#updateFileList()
 
-    for (const file of files) {
-      const clientMessageId = this.#generateClientId()
-      const uploader = new FileUploader(file, this.element.action, clientMessageId, this.#uploadProgress.bind(this))
+    const body = this.#validInput() ? this.textTarget.value : null
+    const bodyHTML = body ? this.textTarget.innerHTML : null
 
-      const body = this.#pendingUploadProgress(file.name)
-      await this.messagesOutlet.insertPendingMessage(clientMessageId, body)
+    if (body) this.#reset()
 
+    for (const [ index, file ] of files.entries()) {
+      await this.#submitFile(file, index == 0 ? body : null, index == 0 ? bodyHTML : null)
+    }
+  }
+
+  async #submitFile(file, body, bodyHTML) {
+    const clientMessageId = this.#generateClientId()
+    const uploader = new FileUploader(file, this.element.action, clientMessageId, this.#uploadProgress.bind(this), body)
+
+    if (bodyHTML) this.#uploadBodyHTML.set(clientMessageId, bodyHTML)
+
+    const pendingBody = this.#pendingUploadProgress(file.name, 0, bodyHTML)
+    await this.messagesOutlet.insertPendingMessage(clientMessageId, pendingBody)
+
+    try {
       const resp = await uploader.upload()
-
       Turbo.renderStreamMessage(resp)
+    } finally {
+      this.#uploadBodyHTML.delete(clientMessageId)
     }
   }
 
   #uploadProgress(percent, clientMessageId, file) {
-    const body = this.#pendingUploadProgress(file.name, percent)
+    const body = this.#pendingUploadProgress(file.name, percent, this.#uploadBodyHTML.get(clientMessageId))
     this.messagesOutlet.updatePendingMessage(clientMessageId, body)
   }
 
@@ -183,8 +205,10 @@ export default class extends Controller {
     this.fileListTarget.replaceChildren(...fileNodes)
   }
 
-  #pendingUploadProgress(filename, percent=0) {
-    return `
+  #pendingUploadProgress(filename, percent=0, bodyHTML=null) {
+    const body = bodyHTML ? `<div class="trix-content">${bodyHTML}</div>` : ""
+
+    return body + `
       <div class="message__pending-upload flex align-center gap" style="--percentage: ${percent}%">
         <div class="composer__file-thumbnail composer__file-thumbnail--common colorize--black borderless flex-item-no-shrink"></div>
         <div>${escapeHTML(filename)} - <span>${percent}%</span></div>

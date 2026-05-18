@@ -87,7 +87,8 @@ class Messages::ByBotsController < MessagesController
         {
           filename: message.attachment.filename.to_s,
           content_type: message.attachment.content_type,
-          byte_size: message.attachment.byte_size
+          byte_size: message.attachment.byte_size,
+          path: rails_blob_path(message.attachment, disposition: "attachment", only_path: true)
         }
       end
     end

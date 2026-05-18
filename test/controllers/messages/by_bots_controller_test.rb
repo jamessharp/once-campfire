@@ -53,6 +53,25 @@ class Messages::ByBotsControllerTest < ActionDispatch::IntegrationTest
     assert_equal [ messages(:twelfth).id, messages(:thirteenth).id ], response.parsed_body["messages"].pluck("id")
   end
 
+  test "index includes attachment metadata and download path" do
+    message = @room.messages.create_with_attachment! \
+      body: "A quiet moon.",
+      creator: users(:david),
+      client_message_id: "captioned-moon",
+      attachment: fixture_file_upload("moon.jpg", "image/jpeg")
+
+    get room_bot_messages_url(@room, @bot.bot_key, format: :json), params: { limit: 1 }
+
+    attachment = response.parsed_body.dig("messages", 0, "attachment")
+
+    assert_response :success
+    assert_equal "moon.jpg", attachment["filename"]
+    assert_equal "image/jpeg", attachment["content_type"]
+    assert_equal message.attachment.byte_size, attachment["byte_size"]
+    assert_equal rails_blob_path(message.attachment, disposition: "attachment", only_path: true), attachment["path"]
+    assert_no_match %r{/storage/}, attachment["path"]
+  end
+
   test "index clamps limit" do
     get room_bot_messages_url(@room, @bot.bot_key, format: :json), params: { limit: 0 }
 

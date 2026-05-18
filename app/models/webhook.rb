@@ -40,8 +40,31 @@ class Webhook < ApplicationRecord
       {
         user:    { id: message.creator.id, name: message.creator.name },
         room:    { id: message.room.id, name: message.room.name, path: room_bot_messages_path(message) },
-        message: { id: message.id, body: { html: message.body.body, plain: without_recipient_mentions(message.plain_text_body) }, path: message_path(message) }
+        message: message_payload(message)
       }.to_json
+    end
+
+    def message_payload(message)
+      {
+        id: message.id,
+        body: { html: message.body.body, plain: without_recipient_mentions(message.plain_text_body) },
+        path: message_path(message)
+      }.tap do |payload|
+        payload[:attachment] = attachment_payload(message) if message.attachment?
+      end
+    end
+
+    def attachment_payload(message)
+      {
+        filename: message.attachment.filename.to_s,
+        content_type: message.attachment.content_type,
+        byte_size: message.attachment.byte_size,
+        path: attachment_path(message)
+      }
+    end
+
+    def attachment_path(message)
+      Rails.application.routes.url_helpers.rails_blob_path message.attachment, disposition: "attachment", only_path: true
     end
 
     def message_path(message)

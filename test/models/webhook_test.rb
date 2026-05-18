@@ -1,6 +1,8 @@
 require "test_helper"
 
 class WebhookTest < ActiveSupport::TestCase
+  include ActionDispatch::TestProcess
+
   test "payload" do
     message = messages(:first)
     message_path = Rails.application.routes.url_helpers.room_at_message_path(message.room, message)
@@ -15,6 +17,30 @@ class WebhookTest < ActiveSupport::TestCase
 
     response = webhooks(:bender).deliver(messages(:first))
     assert_equal 200, response.code.to_i
+  end
+
+  test "payload includes attachment metadata without exposing storage paths" do
+    message = rooms(:watercooler).messages.create_with_attachment! \
+      body: "A quiet moon.",
+      creator: users(:david),
+      client_message_id: "captioned-moon",
+      attachment: fixture_file_upload("moon.jpg", "image/jpeg")
+
+    payload = nil
+    WebMock.stub_request(:post, webhooks(:bender).url).
+      with { |request| payload = JSON.parse(request.body); true }.
+      to_return(status: 200, body: "", headers: {})
+
+    response = webhooks(:bender).deliver(message)
+    attachment = payload.fetch("message").fetch("attachment")
+
+    assert_equal 200, response.code.to_i
+    assert_equal "A quiet moon.", payload.dig("message", "body", "plain")
+    assert_equal "moon.jpg", attachment["filename"]
+    assert_equal "image/jpeg", attachment["content_type"]
+    assert_equal message.attachment.byte_size, attachment["byte_size"]
+    assert_equal Rails.application.routes.url_helpers.rails_blob_path(message.attachment, disposition: "attachment", only_path: true), attachment["path"]
+    assert_no_match %r{/storage/}, attachment["path"]
   end
 
   test "delivery" do

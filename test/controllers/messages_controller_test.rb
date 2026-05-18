@@ -48,12 +48,46 @@ class MessagesControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
+  test "edit renders the caption editor for a message with body and attachment" do
+    message = @room.messages.create_with_attachment! \
+      body: "A quiet moon.",
+      creator: users(:david),
+      client_message_id: "captioned-moon",
+      attachment: fixture_file_upload("moon.jpg", "image/jpeg")
+
+    get edit_room_message_url(@room, message)
+
+    assert_response :success
+    assert_select ".message__attachment"
+    assert_select "trix-editor[aria-label='Edit message']"
+    assert_select "button[type='submit']", text: /Save changes/
+  end
+
   test "creating a message broadcasts the message to the room" do
     post room_messages_url(@room, format: :turbo_stream), params: { message: { body: "New one", client_message_id: 999 } }
 
     assert_rendered_turbo_stream_broadcast @room, :messages, action: "append", target: [ @room, :messages ] do
       assert_select ".message__body", text: /New one/
       assert_copy_link_button room_at_message_url(@room, Message.last, host: "once.campfire.test")
+    end
+  end
+
+  test "creating a message with body and attachment preserves both" do
+    post room_messages_url(@room, format: :turbo_stream), params: { message: {
+      body: "A quiet moon.",
+      client_message_id: "captioned-moon",
+      attachment: fixture_file_upload("moon.jpg", "image/jpeg")
+    } }
+
+    message = Message.last
+
+    assert_response :success
+    assert_equal "A quiet moon.", message.plain_text_body
+    assert_equal "moon.jpg", message.attachment.filename.to_s
+
+    assert_rendered_turbo_stream_broadcast @room, :messages, action: "append", target: [ @room, :messages ] do
+      assert_select ".message__body", text: /A quiet moon./
+      assert_select ".message__attachment"
     end
   end
 
@@ -71,6 +105,21 @@ class MessagesControllerTest < ActionDispatch::IntegrationTest
 
     assert_redirected_to room_message_url(@room, message)
     assert_equal "Updated body", message.reload.plain_text_body
+  end
+
+  test "update removes a caption while preserving an attachment" do
+    message = @room.messages.create_with_attachment! \
+      body: "A quiet moon.",
+      creator: users(:david),
+      client_message_id: "captioned-moon",
+      attachment: fixture_file_upload("moon.jpg", "image/jpeg")
+
+    Turbo::StreamsChannel.expects(:broadcast_replace_to).once
+    put room_message_url(@room, message), params: { message: { body: "" } }
+
+    assert_redirected_to room_message_url(@room, message)
+    assert_equal "moon.jpg", message.reload.plain_text_body
+    assert message.attachment?
   end
 
   test "admin updates a message belonging to another user" do
