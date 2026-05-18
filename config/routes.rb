@@ -62,6 +62,8 @@ Rails.application.routes.draw do
   resources :rooms do
     resources :messages
 
+    get ":bot_key", to: "rooms/by_bots#show", as: :bot
+    get ":bot_key/messages", to: "messages/by_bots#index"
     post ":bot_key/messages", to: "messages/by_bots#create", as: :bot_messages
     post ":bot_key/typing", to: "typing_notifications/by_bots#create", as: :bot_typing
     delete ":bot_key/typing", to: "typing_notifications/by_bots#destroy"
