@@ -27,7 +27,7 @@ class SendingMessagesTest < ApplicationSystemTestCase
   end
 
   test "sending a caption with multiple attachments" do
-    attach_file "Attach a file", [ file_fixture("earth.png"), file_fixture("moon.jpg") ], make_visible: true
+    attach_file "Attach a file", [ file_fixture("black_hole.jpg"), file_fixture("moon.jpg") ], make_visible: true
 
     send_message "A quiet moon."
 
