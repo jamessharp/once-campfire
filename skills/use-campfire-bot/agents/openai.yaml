@@ -1,0 +1,4 @@
+interface:
+  display_name: "Campfire Bot"
+  short_description: "Operate Once Campfire via bot APIs"
+  default_prompt: "Use $use-campfire-bot to read room context, show typing, and post a Campfire bot reply."
